@@ -1,99 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, Heart, Activity, Sparkles, MessageCircle, TrendingUp, Clock } from 'lucide-react';
+import { Calendar, Heart, Activity, Sparkles, MessageCircle, TrendingUp, Clock, AlertTriangle } from 'lucide-react';
 
-// モックデータ（5分間の振り返りセッション）
-const mockSessionData = {
-  date: '2025-01-20',
-  duration: '5:42',
-  startTime: '21:00',
-  segments: [
-    {
-      id: 1,
-      timeRange: '0:00 - 0:45',
-      text: '今日は朝からカフェに行って、モーニングを食べながら仕事の準備をしたんだけど、',
-      topic: '朝のルーティン',
-      avgHeartRate: 68,
-      avgEda: 0.3,
-      emotion: 'calm'
-    },
-    {
-      id: 2,
-      timeRange: '0:45 - 1:30',
-      text: '実は今日、すごく大事なプレゼンがあって...正直めちゃくちゃ緊張してて、朝からドキドキが止まらなかったの。',
-      topic: '仕事のプレゼン',
-      avgHeartRate: 85,
-      avgEda: 0.8,
-      emotion: 'anxious'
-    },
-    {
-      id: 3,
-      timeRange: '1:30 - 2:15',
-      text: 'でもね、プレゼンが終わったら上司にすごく褒められて！「よく準備してたね」って言われて、本当に嬉しかった〜',
-      topic: '成功体験',
-      avgHeartRate: 78,
-      avgEda: 0.7,
-      emotion: 'excited'
-    },
-    {
-      id: 4,
-      timeRange: '2:15 - 3:00',
-      text: 'お昼は同僚とランチに行って、プレゼンの話で盛り上がっちゃった。みんな応援してくれてたみたいで、',
-      topic: '同僚との交流',
-      avgHeartRate: 72,
-      avgEda: 0.5,
-      emotion: 'happy'
-    },
-    {
-      id: 5,
-      timeRange: '3:00 - 3:45',
-      text: '午後は少し疲れが出てきて、集中力が切れちゃった時間もあったけど、コーヒー飲んで気分転換したら復活！',
-      topic: '午後の疲れ',
-      avgHeartRate: 70,
-      avgEda: 0.4,
-      emotion: 'tired'
-    },
-    {
-      id: 6,
-      timeRange: '3:45 - 4:30',
-      text: '夕方は早めに仕事を切り上げて、ジムに行ってきた。最近運動不足だったから、すごくスッキリした感じ。',
-      topic: '運動',
-      avgHeartRate: 82,
-      avgEda: 0.6,
-      emotion: 'energetic'
-    },
-    {
-      id: 7,
-      timeRange: '4:30 - 5:42',
-      text: '家に帰ってきてお風呂に入って、今こうして振り返ってみると、今日は本当に充実した一日だったなって思う。明日も頑張ろう！',
-      topic: '一日の振り返り',
-      avgHeartRate: 66,
-      avgEda: 0.3,
-      emotion: 'peaceful'
-    }
-  ],
-  // 詳細な時系列データ（1秒ごと）
-  timeSeriesData: generateTimeSeriesData(342), // 5:42 = 342秒
-  insights: {
-    emotionalPeaks: [
-      { time: '1:45', emotion: 'anxious', description: 'プレゼンの話で緊張がピークに' },
-      { time: '2:30', emotion: 'excited', description: '褒められた瞬間の喜び' }
-    ],
-    patterns: [
-      '緊張する場面（プレゼン）で心拍数が85bpmまで上昇',
-      '運動時を除くと、リラックス時の心拍数は65-70bpm程度で安定',
-      '社交的な場面（ランチ）では適度な興奮状態を維持'
-    ],
-    summary: '今日は大きなチャレンジ（プレゼン）を乗り越えた達成感のある一日でした。緊張はしたものの、それを良いパフォーマンスに繋げられた様子が生体データからも読み取れます。特に成功体験後の心理状態が安定しており、自信につながったことがわかります。'
-  }
-};
+// --- Helper Functions & Components ---
 
-// 時系列データ生成（モック）
-function generateTimeSeriesData(seconds) {
+// 時系列データ生成（モック） - これはバックエンドから取得されるデータなので、将来的には不要
+function generateTimeSeriesData(seconds, segments) {
   const data = [];
   for (let i = 0; i < seconds; i++) {
-    const segment = Math.floor(i / 45); // 45秒ごとのセグメント
-    const baseHR = [68, 85, 78, 72, 70, 82, 66][segment] || 70;
-    const baseEDA = [0.3, 0.8, 0.7, 0.5, 0.4, 0.6, 0.3][segment] || 0.5;
+    // Find which segment this second belongs to
+    let currentSegment = segments[0];
+    for (const seg of segments) {
+        const timeParts = seg.timeRange.split(' - ');
+        const start = timeParts[0].split(':').reduce((acc, time) => (60 * acc) + +time);
+        const end = timeParts[1].split(':').reduce((acc, time) => (60 * acc) + +time);
+        if (i >= start && i <= end) {
+            currentSegment = seg;
+            break;
+        }
+    }
+    
+    const baseHR = currentSegment.avgHeartRate;
+    const baseEDA = currentSegment.avgEda;
     
     data.push({
       second: i,
@@ -103,6 +30,7 @@ function generateTimeSeriesData(seconds) {
   }
   return data;
 }
+
 
 // ふわともキャラクターコンポーネント
 const Fuwatomo = ({ emotion = 'happy', size = 'medium' }) => {
@@ -142,7 +70,7 @@ const TranscriptionSegment = ({ segment, isActive, onClick }) => {
   };
 
   return (
-    <div 
+    <div
       className={`mb-4 p-4 rounded-2xl border-2 cursor-pointer transition-all duration-300 ${
         emotionColors[segment.emotion]
       } ${isActive ? 'ring-4 ring-pink-400 scale-102' : 'hover:scale-101'}`}
@@ -172,25 +100,28 @@ const TranscriptionSegment = ({ segment, isActive, onClick }) => {
 };
 
 // 統合グラフコンポーネント
-const IntegratedGraph = ({ data, segments, activeSegmentId, onTimeHover }) => {
+const IntegratedGraph = ({ sessionData, activeSegmentId }) => {
   const canvasRef = useRef(null);
-  const [hoveredTime, setHoveredTime] = useState(null);
+  const { timeSeriesData, segments, insights } = sessionData;
 
   useEffect(() => {
+    if (!timeSeriesData || !segments) return;
+
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const width = canvas.width;
     const height = canvas.height;
 
-    // Clear canvas
     ctx.clearRect(0, 0, width, height);
 
     // セグメント背景を描画
-    segments.forEach((segment, idx) => {
-      const startTime = idx * 45;
-      const endTime = Math.min((idx + 1) * 45, data.length);
-      const startX = (startTime / data.length) * width;
-      const endX = (endTime / data.length) * width;
+    segments.forEach((segment) => {
+        const timeParts = segment.timeRange.split(' - ');
+        const startTime = timeParts[0].split(':').reduce((acc, time) => (60 * acc) + +time);
+        const endTime = timeParts[1].split(':').reduce((acc, time) => (60 * acc) + +time);
+
+        const startX = (startTime / timeSeriesData.length) * width;
+        const endX = (endTime / timeSeriesData.length) * width;
 
       const colors = {
         happy: 'rgba(255, 235, 59, 0.1)',
@@ -205,7 +136,6 @@ const IntegratedGraph = ({ data, segments, activeSegmentId, onTimeHover }) => {
       ctx.fillStyle = colors[segment.emotion] || 'rgba(0, 0, 0, 0.05)';
       ctx.fillRect(startX, 0, endX - startX, height);
 
-      // アクティブセグメントのハイライト
       if (segment.id === activeSegmentId) {
         ctx.strokeStyle = '#FF69B4';
         ctx.lineWidth = 2;
@@ -227,16 +157,13 @@ const IntegratedGraph = ({ data, segments, activeSegmentId, onTimeHover }) => {
     ctx.strokeStyle = '#FF69B4';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    data.forEach((point, idx) => {
-      const x = (idx / data.length) * width;
+    timeSeriesData.forEach((point, idx) => {
+      const x = (idx / timeSeriesData.length) * width;
       const normalizedHR = (point.heartRate - 60) / 30; // 60-90の範囲で正規化
       const y = height - (normalizedHR * height * 0.8 + height * 0.1);
 
-      if (idx === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
+      if (idx === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     });
     ctx.stroke();
 
@@ -244,23 +171,20 @@ const IntegratedGraph = ({ data, segments, activeSegmentId, onTimeHover }) => {
     ctx.strokeStyle = '#9370DB';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    data.forEach((point, idx) => {
-      const x = (idx / data.length) * width;
+    timeSeriesData.forEach((point, idx) => {
+      const x = (idx / timeSeriesData.length) * width;
       const y = height - (point.eda * height * 0.8 + height * 0.1);
 
-      if (idx === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
+      if (idx === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     });
     ctx.stroke();
 
     // 感情ピークマーカー
-    mockSessionData.insights.emotionalPeaks.forEach(peak => {
+    insights.emotionalPeaks.forEach(peak => {
       const [min, sec] = peak.time.split(':').map(Number);
       const totalSec = min * 60 + sec;
-      const x = (totalSec / data.length) * width;
+      const x = (totalSec / timeSeriesData.length) * width;
 
       ctx.fillStyle = peak.emotion === 'anxious' ? '#FF4444' : '#FF69B4';
       ctx.beginPath();
@@ -268,7 +192,7 @@ const IntegratedGraph = ({ data, segments, activeSegmentId, onTimeHover }) => {
       ctx.fill();
     });
 
-  }, [data, segments, activeSegmentId]);
+  }, [timeSeriesData, segments, activeSegmentId, insights]);
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-lg">
@@ -290,7 +214,7 @@ const IntegratedGraph = ({ data, segments, activeSegmentId, onTimeHover }) => {
       </div>
       <canvas ref={canvasRef} width={600} height={250} className="w-full" />
       <div className="mt-4 text-xs text-gray-500 text-center">
-        時間: 0:00 - {mockSessionData.duration}
+        時間: 0:00 - {sessionData.duration}
       </div>
     </div>
   );
@@ -339,29 +263,83 @@ const InsightsPanel = ({ insights }) => {
   );
 };
 
-// メインアプリコンポーネント
+// --- Loading and Error Components ---
+
+const LoadingScreen = () => (
+  <div className="min-h-screen bg-gradient-to-br from-pink-50 to-yellow-50 flex items-center justify-center">
+    <div className="text-center">
+      <Fuwatomo size="large" emotion="calm" />
+      <p className="mt-4 text-pink-400 text-lg">ふわともが振り返りを準備中...</p>
+      <div className="mt-2 flex justify-center gap-1">
+        <div className="w-2 h-2 bg-pink-300 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+        <div className="w-2 h-2 bg-pink-300 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+        <div className="w-2 h-2 bg-pink-300 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+      </div>
+    </div>
+  </div>
+);
+
+const ErrorScreen = ({ error }) => (
+    <div className="min-h-screen bg-red-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md text-center bg-white p-8 rounded-2xl shadow-lg">
+            <AlertTriangle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-red-600 mb-2">おっと、問題が発生しました</h2>
+            <p className="text-gray-600 mb-6">データの取得中にエラーが発生しました。しばらくしてからもう一度お試しください。</p>
+            <p className="text-sm text-gray-500 bg-gray-100 p-3 rounded-lg">
+                エラー詳細: {error.message}
+            </p>
+        </div>
+    </div>
+);
+
+
+// --- メインアプリコンポーネント ---
 export default function App() {
+  const [sessionData, setSessionData] = useState(null);
   const [activeSegmentId, setActiveSegmentId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    setTimeout(() => setIsLoading(false), 1500);
-  }, []);
+    const fetchSessionData = async () => {
+      try {
+        // APIエンドポイントからデータを取得
+        // 開発中はモックサーバーやローカルのJSONファイルを使うと便利です
+        // const response = await fetch('/api/session-data');
+        // if (!response.ok) {
+        //   throw new Error(`HTTP error! status: ${response.status}`);
+        // }
+        // const data = await response.json();
+
+        const response = await fetch('http://localhost:3001/api/session-data');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+
+        setSessionData(data);
+
+      } catch (e) {
+        setError(e);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSessionData();
+  }, []); // 空の依存配列で、コンポーネントのマウント時に一度だけ実行
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 to-yellow-50 flex items-center justify-center">
-        <div className="text-center">
-          <Fuwatomo size="large" emotion="calm" />
-          <p className="mt-4 text-pink-400 text-lg">ふわともが振り返りを準備中...</p>
-          <div className="mt-2 flex justify-center gap-1">
-            <div className="w-2 h-2 bg-pink-300 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
-            <div className="w-2 h-2 bg-pink-300 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-            <div className="w-2 h-2 bg-pink-300 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
-          </div>
-        </div>
-      </div>
-    );
+    return <LoadingScreen />;
+  }
+
+  if (error) {
+    return <ErrorScreen error={error} />;
+  }
+
+  if (!sessionData) {
+    // データがない場合（エラーではないが、データがnullの場合）
+    return <ErrorScreen error={{ message: "セッションデータが見つかりませんでした。" }} />;
   }
 
   return (
@@ -377,11 +355,11 @@ export default function App() {
             <div className="flex items-center gap-4 text-pink-400">
               <div className="flex items-center gap-2">
                 <Calendar className="w-5 h-5" />
-                <span className="font-medium">2025年1月20日</span>
+                <span className="font-medium">{sessionData.date}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="w-5 h-5" />
-                <span className="font-medium">{mockSessionData.duration}</span>
+                <span className="font-medium">{sessionData.duration}</span>
               </div>
             </div>
           </div>
@@ -392,9 +370,8 @@ export default function App() {
       <main className="container mx-auto px-4 py-8">
         {/* 統合グラフ */}
         <div className="mb-8">
-          <IntegratedGraph 
-            data={mockSessionData.timeSeriesData}
-            segments={mockSessionData.segments}
+          <IntegratedGraph
+            sessionData={sessionData}
             activeSegmentId={activeSegmentId}
           />
         </div>
@@ -409,7 +386,7 @@ export default function App() {
               </h2>
               
               <div className="space-y-2">
-                {mockSessionData.segments.map((segment) => (
+                {sessionData.segments.map((segment) => (
                   <TranscriptionSegment
                     key={segment.id}
                     segment={segment}
@@ -424,7 +401,7 @@ export default function App() {
           {/* 右カラム - 洞察 */}
           <div className="lg:col-span-1">
             <div className="sticky top-24">
-              <InsightsPanel insights={mockSessionData.insights} />
+              <InsightsPanel insights={sessionData.insights} />
             </div>
           </div>
         </div>
